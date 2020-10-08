@@ -1,0 +1,1648 @@
+---
+title: "Jail Incarceration and Cause-Specific Mortality - cleaning and analysis"
+author: "Sandhya Kajeepeta"
+date: "April 9, 2020"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+#Setup and import
+
+```{r}
+library(rio)
+library(tidyverse)
+library(haven)
+library(openxlsx)
+```
+
+#Read in Vera Institute of Justice Incarceration Trends data
+```{r}
+#Downloaded from Vera Incarceration Trends GitHub: https://github.com/vera-institute/incarceration-trends
+JailAnalysisData <- read.xlsx("~/incarceration_trends.xlsx")
+```
+
+#Limit data set to 1987-2017
+```{r}
+JailAnalysisData <- JailAnalysisData %>% filter(year > 1986)
+```
+
+#Create rate variables for jail stats relative to county pop
+```{r}
+JailAnalysisData$County_ADPRate <- (JailAnalysisData$total_jail_pop/JailAnalysisData$total_pop)*1000
+JailAnalysisData$White_ConfinedRate <- (JailAnalysisData$white_jail_pop/JailAnalysisData$white_pop_15to64)*100
+JailAnalysisData$Black_ConfinedRate <-(JailAnalysisData$black_jail_pop/JailAnalysisData$black_pop_15to64)*100
+```
+
+
+#Read in NYC population totals
+```{r}
+load("./NYC population totals/NYC_8090.Rdata")
+load("./NYC population totals/NYC_9000.Rdata")
+load("./NYC population totals/NYC_2000.Rdata")
+load("./NYC population totals/NYC_2010.Rdata")
+
+NYC_8090 <- NYC_8090 %>% group_by(Year_of_Estimate, FIPS_State_and_County_Codes) %>% summarise(Total = sum(`sum(Freq)`))
+NYC_9000 <- NYC_9000 %>% group_by(Year, FIPS) %>% summarise(Total = sum(`sum(Pop)`))
+NYC_2000 <- NYC_2000 %>% group_by(YEAR, FIPS) %>% summarise(Total = sum(Freq))
+NYC_2010 <- NYC_2010 %>% group_by(YEAR, FIPS) %>% summarise(Total = sum(Freq))
+
+colnames(NYC_8090)[colnames(NYC_8090)=="Year_of_Estimate"] <- "Year"
+colnames(NYC_8090)[colnames(NYC_8090)=="FIPS_State_and_County_Codes"] <- "FIPS"
+colnames(NYC_2000)[colnames(NYC_2000)=="YEAR"] <- "Year"
+colnames(NYC_2010)[colnames(NYC_2010)=="YEAR"] <- "Year"
+
+NYC_8090 <- ungroup(NYC_8090)
+NYC_9000 <- ungroup(NYC_9000)
+NYC_2000 <- ungroup(NYC_2000)
+NYC_2010 <- ungroup(NYC_2010)
+
+NYC_8090$Year <- as.character(NYC_8090$Year)
+NYC_2000$FIPS <- as.numeric(NYC_2000$FIPS)
+NYC_2010$FIPS <- as.numeric(NYC_2010$FIPS)
+
+NYC_totals <- bind_rows(NYC_8090, NYC_9000)
+NYC_totals <- bind_rows(NYC_totals, NYC_2000)
+NYC_totals <- bind_rows(NYC_totals, NYC_2010)
+
+```
+
+#Create a list of all fips and all years in jaildata
+```{r}
+allfips <- unique(JailAnalysisData$fips)
+allyears <- 1986:2017
+fipsyears <- data.frame(expand.grid(allfips, allyears))
+fipsyears$FIPS <- as.character(fipsyears$Var1)
+fipsyears$Var1 <- NULL
+fipsyears$Year <- as.character(fipsyears$Var2)
+fipsyears$Var2 <- NULL
+fipsyears$FIPS <- as.character(as.numeric(fipsyears$FIPS))
+```
+
+
+#Read in mortality data
+```{r}
+
+MortalityData <- read_csv("./Mortality data/1999-2017/Total Crude.csv")
+
+cod <- read_csv("./Mortality data/1979-1998/Total Crude.csv")
+
+MortalityData <- bind_rows(MortalityData, cod)
+
+```
+#Read in and join Cancer data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Cancer.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Cancer.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, CancerDeaths), by = c("FIPS", "Year"))
+
+
+```
+
+#Read in and join Cerebrovascular data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Cerebrovascular.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Cerebrovascular.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, CerebroDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Chronic Lower Resp data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Lower Respiratory.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Lower Respiratory.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, LwrRspDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Diabetes data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Diabetes.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Diabetes.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, DiabDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Substance Use Disorder data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Drug-Induced.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Drug-Induced.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, SubUseDisDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Heart Disease data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Heart Disease.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Heart Disease.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, HeartDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Suicide data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Suicide.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Suicide.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, SuicDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Unintentional Injury data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Unintentional injury.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Unintentional injury.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, UnintInjDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Read in and join Infectious Disease data
+```{r}
+cod1 <- read_csv("./Mortality data/1999-2017/Infectious.csv")
+
+cod2 <- read_csv("./Mortality data/1979-1998/Infectious.csv")
+
+cod <- bind_rows(cod1, cod2)
+
+MortalityData <- MortalityData %>% left_join(select(cod, FIPS, Year, InfectDeaths), by = c("FIPS", "Year"))
+
+```
+
+#Data cleaning for NYC rates because jail data is aggregated to all of NYC (instead of 5 unique counties within NYC)
+
+#Calculate rate for all NYC boroughs and tag as Manhattan
+```{r}
+NYCMort <- filter(MortalityData, FIPS %in% c('36005', '36047', '36061', '36081', '36085'))
+NYCMort$FIPS <- as.numeric(NYCMort$FIPS)
+NYCMortTot <- NYCMort %>% group_by(Year) %>% summarize_all(sum)
+NYCMortTot <- ungroup(NYCMortTot)
+NYCMortTot <- mutate(NYCMortTot, FIPS = '36061')
+NYCMortTot$Year <- as.numeric(NYCMortTot$Year)
+colnames(NYCMortTot) <- paste("NYC", colnames(NYCMortTot), sep = "_")
+colnames(NYCMortTot)[colnames(NYCMortTot)=="NYC_Year"] <- "Year"
+colnames(NYCMortTot)[colnames(NYCMortTot)=="NYC_FIPS"] <- "FIPS"
+NYCMortTot$FIPS <- as.numeric(NYCMortTot$FIPS)
+
+MortalityData <- left_join(MortalityData, NYCMortTot, by = c("Year", "FIPS"))
+```
+
+#Set all mortality values to updated NYC values
+```{r}
+MortalityData$Deaths <- ifelse(is.na(MortalityData$NYC_Deaths), MortalityData$Deaths, MortalityData$NYC_Deaths)
+MortalityData$CancerDeaths <- ifelse(is.na(MortalityData$NYC_CancerDeaths), MortalityData$CancerDeaths, MortalityData$NYC_CancerDeaths)
+MortalityData$CerebroDeaths <- ifelse(is.na(MortalityData$NYC_CerebroDeaths), MortalityData$CerebroDeaths, MortalityData$NYC_CerebroDeaths)
+MortalityData$LwrRspDeaths <- ifelse(is.na(MortalityData$NYC_LwrRspDeaths), MortalityData$LwrRspDeaths, MortalityData$NYC_LwrRspDeaths)
+MortalityData$DiabDeaths <- ifelse(is.na(MortalityData$NYC_DiabDeaths), MortalityData$DiabDeaths, MortalityData$NYC_DiabDeaths)
+MortalityData$DiabDeaths <- ifelse(is.na(MortalityData$NYC_SubUseDisDeaths), MortalityData$DiabDeaths, MortalityData$NYC_SubUseDisDeaths)
+MortalityData$HeartDeaths <- ifelse(is.na(MortalityData$NYC_HeartDeaths), MortalityData$HeartDeaths, MortalityData$NYC_HeartDeaths)
+MortalityData$SuicDeaths <- ifelse(is.na(MortalityData$NYC_SuicDeaths), MortalityData$SuicDeaths, MortalityData$NYC_SuicDeaths)
+MortalityData$UnintInjDeaths <- ifelse(is.na(MortalityData$NYC_UnintInjDeaths), MortalityData$UnintInjDeaths, MortalityData$NYC_UnintInjDeaths)
+MortalityData$InfectDeaths <- ifelse(is.na(MortalityData$NYC_InfectDeaths), MortalityData$InfectDeaths, MortalityData$NYC_InfectDeaths)
+MortalityData$Population <- ifelse(is.na(MortalityData$NYC_Population), MortalityData$Population, MortalityData$NYC_Population)
+
+
+```
+
+#Subtract one from year for time-lag approach
+```{r}
+MortalityData$Year <- MortalityData$Year - 1
+```
+
+#Join mortality data
+```{r}
+colnames(JailAnalysisData)[colnames(JailAnalysisData)=="year"] <- "Year"
+colnames(JailAnalysisData)[colnames(JailAnalysisData)=="fips"] <- "FIPS"
+
+JailAnalysisData$FIPS <- as.character(as.numeric(JailAnalysisData$FIPS))
+JailAnalysisData$Year <- as.character(JailAnalysisData$Year)
+
+MortalityData$FIPS <- as.character(MortalityData$FIPS)
+MortalityData$Year <- as.character(MortalityData$Year)
+
+JailMortalityData <- left_join(JailAnalysisData, MortalityData, by = c("FIPS", "Year"))
+
+```
+
+
+#Read in poverty data
+```{r}
+PovertyData <- read_csv("./Confounder Data/Poverty data_to join.csv")
+
+```
+
+#Drop Household income
+```{r}
+PovertyData <- subset(PovertyData, select = -c(`Median Household Income in Dollars`))
+```
+
+#Add missing years to poverty data
+```{r}
+PovertyData$FIPS <- as.character(PovertyData$FIPS)
+PovertyData$Year <- as.character(PovertyData$Year)
+PovertyData <- full_join(fipsyears, PovertyData, by=c("Year", "FIPS"))
+PovertyData <- subset(PovertyData, select = c("Year", "FIPS", "All Ages in Poverty Percent"))
+```
+
+#For Missing Poverty data, replace with previous year
+```{r}
+PovertyData <- PovertyData %>% group_by(FIPS) %>% arrange(Year) %>% fill("All Ages in Poverty Percent", .direction="down")
+```
+
+#Fill in missing data for 1986-1988 - replacing with 1989 data because only data available until 1993
+```{r}
+PovertyData <- PovertyData %>% group_by(FIPS) %>% arrange(Year) %>% fill("All Ages in Poverty Percent", .direction="up")
+
+```
+
+
+#Calculate rate for all NYC boroughs and tag as Manhattan
+```{r}
+NYCPov <- filter(PovertyData, FIPS %in% c('36005', '36047', '36061', '36081', '36085'))
+NYCPov$Year <- as.character(NYCPov$Year)
+NYCPov$FIPS <- as.numeric(NYCPov$FIPS)
+NYCPov <- left_join(NYCPov, NYC_totals, by = c("FIPS", "Year"))
+NYCPov$PovCount <- NYCPov$`All Ages in Poverty Percent`*NYCPov$Total/100.0
+NYCPov$`Median Household Income in Dollars` <- NULL
+NYCPovTot <- NYCPov %>% group_by(Year) %>% summarize_all(sum)
+NYCPovTot <- ungroup(NYCPovTot)
+NYCPovTot$`All Ages in Poverty Percent` <- NYCPovTot$PovCount/NYCPovTot$Total*100.0
+NYCPovTot <- mutate(NYCPovTot, FIPS = '36061')
+NYCPovTot$Total <- NULL
+NYCPovTot$PovCount <- NULL
+NYCPovTot$NYCPov <- NYCPovTot$`All Ages in Poverty Percent`
+NYCPovTot$`All Ages in Poverty Percent` <- NULL
+
+
+PovertyData <- left_join(PovertyData, NYCPovTot, by = c("Year", "FIPS"))
+
+PovertyData$`All Ages in Poverty Percent` <- ifelse(is.na(PovertyData$NYCPov), PovertyData$`All Ages in Poverty Percent`, PovertyData$NYCPov)
+PovertyData$NYCPov <- NULL
+```
+
+#Add one to year for time-lag approach
+```{r}
+PovertyData$Year <- as.numeric(PovertyData$Year)
+PovertyData$Year <- PovertyData$Year + 1
+
+```
+#Join poverty data
+```{r}
+PovertyData$Year <- as.character(PovertyData$Year)
+JailMortalityData <- left_join(JailMortalityData, PovertyData, by = c("FIPS", "Year"))
+
+```
+
+
+#Bring in crime data
+```{r}
+setwd("./Confounder data/UCR Offense data") #set working directory to folder with all the excel data files
+filelist <-list.files(pattern = ".*.xlsx") #add any file with the .xlsx extention to a list
+datalist <- lapply(filelist, function(x) import(x)) #import all the excel files in the list into a list of data frames 
+dl <- datalist
+```
+
+#Select variables from each year
+
+##1986
+```{r}
+
+dl[[1]] <- dl[[1]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v14", #murders
+  "v15", #rape
+  "v16", #robberies
+  "v17", #agg assault
+  "v18", #burglaries
+  "v19", #larcenies
+  "v20", #mv theft
+  "v23" #arsons
+  )]
+
+```
+
+##1987
+```{r}
+
+dl[[2]] <- dl[[2]][,c("V1", #Year
+  "fipsst",
+  "fipscty",
+  "murders",
+  "rape",
+  "robberies",
+  "aggassault",
+  "burglaries",
+  "larcenies",
+  "mv",
+  "arsons")]
+
+```
+
+##1988
+```{r}
+
+dl[[3]] <- dl[[3]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v10", #murders
+  "v11", #rape
+  "v12", #robberies
+  "v13", #agg assault
+  "v14", #burglaries
+  "v15", #larcenies
+  "v16", #mv theft
+  "v17" #arsons
+  )]
+
+```
+
+##1989
+```{r}
+
+dl[[4]] <- dl[[4]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v10", #murders
+  "v11", #rape
+  "v12", #robberies
+  "v13", #agg assault
+  "v14", #burglaries
+  "v15", #larcenies
+  "v16", #mv theft
+  "v17" #arsons
+  )]
+
+```
+
+##1990
+```{r}
+
+dl[[5]] <- dl[[5]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v11", #murders
+  "v12", #rape
+  "v13", #robberies
+  "v14", #agg assault
+  "v15", #burglaries
+  "v16", #larcenies
+  "v17", #mv theft
+  "v18" #arsons
+  )]
+
+```
+
+##1991
+```{r}
+
+dl[[6]] <- dl[[6]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v11", #murders
+  "v12", #rape
+  "v13", #robberies
+  "v14", #agg assault
+  "v15", #burglaries
+  "v16", #larcenies
+  "v17", #mv theft
+  "v18" #arsons
+  )]
+
+```
+
+##1992
+```{r}
+
+dl[[7]] <- dl[[7]][,c("v1", #Year
+  "v5", #state code
+  "v6", #county code
+  "v11", #murders
+  "v12", #rape
+  "v13", #robberies
+  "v14", #agg assault
+  "v15", #burglaries
+  "v16", #larcenies
+  "v17", #mv theft
+  "v18" #arsons
+  )]
+
+```
+
+##1993 missing
+
+##1994
+```{r}
+
+dl[[8]] <- dl[[8]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##1995
+```{r}
+
+dl[[9]] <- dl[[9]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##1996
+```{r}
+
+dl[[10]] <- dl[[10]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##1997
+```{r}
+
+dl[[11]] <- dl[[11]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##1998
+```{r}
+
+dl[[12]] <- dl[[12]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##1999
+```{r}
+
+dl[[13]] <- dl[[13]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##2000
+```{r}
+
+dl[[14]] <- dl[[14]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##2001
+```{r}
+
+dl[[15]] <- dl[[15]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##2002
+```{r}
+
+dl[[16]] <- dl[[16]][,c("studyno", #Year
+  "fips_st", #state code
+  "fips_cty", #county code
+  "murder", #murders
+  "rape", #rape
+  "robbery", #robberies
+  "agasslt", #agg assault
+  "burglry", #burglaries
+  "larceny", #larcenies
+  "mvtheft", #mv theft
+  "arson" #arsons
+  )]
+
+```
+
+##2003-16
+```{r}
+
+Clean03_16 <- function(x){
+x <- x[,c("STUDYNO",
+    "FIPS_ST",
+    "FIPS_CTY",
+    "MURDER",
+    "RAPE",
+    "ROBBERY",
+    "AGASSLT",
+    "BURGLRY",
+    "LARCENY",
+    "MVTHEFT",
+    "ARSON"
+     )]
+  x
+}
+
+dl[c(17:29)] <- lapply(dl[c(17:29)], Clean03_16)
+```
+
+
+#Standardize variable names
+```{r}
+
+#For the years 1-15, Standardize names with first 2003-16
+
+
+CleanID <- function(x){
+  
+  names(x) <- c("STUDYNO",
+    "FIPS_ST",
+    "FIPS_CTY",
+    "MURDER",
+    "RAPE",
+    "ROBBERY",
+    "AGASSLT",
+    "BURGLRY",
+    "LARCENY",
+    "MVTHEFT",
+    "ARSON")
+  x
+}
+
+dl[c(1:16)] <- lapply(dl[c(1:16)], CleanID)
+
+```
+
+#Collapse list into single data frame
+```{r}
+
+CrimeData <- do.call(rbind, dl)
+
+
+```
+
+#Additional data cleaning for UCR Crime data
+
+```{r}
+#Change STUDYNO var to Year
+names(CrimeData)[names(CrimeData) == "STUDYNO"] <- "Year"
+
+
+#Create FIPS code from FIP_ST and FIPS_CTY
+CrimeData$FIPS_ST <- as.character(CrimeData$FIPS_ST)
+CrimeData$FIPS_CTY <- as.character(CrimeData$FIPS_CTY)
+
+CrimeData$FIPS_CTY <- str_pad(CrimeData$FIPS_CTY, width=3, side="left", pad="0")
+
+CrimeData$FIPS <- paste0(CrimeData$FIPS_ST, CrimeData$FIPS_CTY)
+
+
+#Create Violent Crime, Property Crime, and Total Crime sums
+CrimeData$ViolCrime <- CrimeData$MURDER + CrimeData$RAPE + CrimeData$ROBBERY + CrimeData$AGASSLT
+CrimeData$PropCrime <- CrimeData$BURGLRY + CrimeData$LARCENY + CrimeData$MVTHEFT + CrimeData$ARSON
+CrimeData$TotalCrime <- CrimeData$ViolCrime + CrimeData$PropCrime
+
+CrimeData$FIPS_CTY <- NULL
+CrimeData$FIPS_ST <- NULL
+
+```
+
+#Add missing years to crime data
+```{r}
+CrimeData$FIPS <- as.character(CrimeData$FIPS)
+CrimeData$Year <- as.character(CrimeData$Year)
+CrimeData <- full_join(fipsyears,CrimeData, by=c("Year", "FIPS"))
+
+```
+
+#For Missing Crime data, replace with previous year
+```{r}
+CrimeData <- CrimeData %>% group_by(FIPS) %>% arrange(Year) %>% fill("TotalCrime", .direction="down")
+```
+
+
+#Calculate rate for all NYC boroughs and tag as Manhattan
+```{r}
+CrimeData$Year <- as.numeric(CrimeData$Year)
+NYCCrime <- filter(CrimeData, FIPS %in% c('36005', '36047', '36061', '36081', '36085'))
+NYCCrime$FIPS <- as.numeric(NYCCrime$FIPS)
+NYCCrimeTot <- NYCCrime %>% group_by(Year) %>% summarize_all(sum)
+NYCCrimeTot <- ungroup(NYCCrimeTot)
+NYCCrimeTot <- mutate(NYCCrimeTot, FIPS = '36061')
+NYCCrimeTot$Year <- as.numeric(NYCCrimeTot$Year)
+colnames(NYCCrimeTot) <- paste("NYC", colnames(NYCCrimeTot), sep = "_")
+colnames(NYCCrimeTot)[colnames(NYCCrimeTot)=="NYC_Year"] <- "Year"
+colnames(NYCCrimeTot)[colnames(NYCCrimeTot)=="NYC_FIPS"] <- "FIPS"
+
+CrimeData <- left_join(CrimeData, NYCCrimeTot, by = c("Year", "FIPS"))
+
+CrimeData$TotalCrime <- ifelse(is.na(CrimeData$NYC_TotalCrime), CrimeData$TotalCrime, CrimeData$NYC_TotalCrime)
+
+
+```
+
+#Add one to year for time-lag approach
+```{r}
+
+CrimeData$Year <- CrimeData$Year + 1
+
+```
+
+#Join crime data
+```{r}
+CrimeData$Year <- as.character(CrimeData$Year)
+
+JailMortalityData <- left_join(JailMortalityData, CrimeData, by = c("FIPS", "Year"))
+
+```
+
+#Bring in unemployment data
+```{r}
+setwd("./Confounder data/County_Unemployment_1990-2015") #set working directory to folder with all the excel data files
+filelist <-list.files(pattern = ".*.csv") #add any file with the .csv extention to a list
+datalist <- lapply(filelist, function(x) import(x)) #import all the excel files in the list into a list of data frames 
+dl <- datalist
+```
+
+#Select variables from each year
+```{r}
+Clean90_17 <- function(x){
+x <- x[,c("Year", 
+  "State_FIPS",
+  "County_FIPS",
+  "Unemployment_Rate")]
+  x
+}
+
+dl[c(1:28)] <- lapply(dl[c(1:28)], Clean90_17)
+
+```
+
+#Collapse list into single data frame
+```{r}
+
+UnemployData <- do.call(rbind, dl)
+
+
+```
+
+#Create FIPS code from State_FIPS and County_FIPS
+```{r}
+
+UnemployData$State_FIPS <- as.character(UnemployData$State_FIPS)
+UnemployData$County_FIPS <- as.character(UnemployData$County_FIPS)
+
+UnemployData$County_FIPS <- str_pad(UnemployData$County_FIPS, width=3, side="left", pad="0")
+
+UnemployData$FIPS <- paste0(UnemployData$State_FIPS, UnemployData$County_FIPS)
+
+UnemployData$County_FIPS <- NULL
+UnemployData$State_FIPS <- NULL
+
+```
+
+#Add missing years to unemploy data
+```{r}
+UnemployData$Year <- as.character(UnemployData$Year)
+UnemployData <- full_join(fipsyears,UnemployData, by=c("Year", "FIPS"))
+
+```
+
+#For Missing unemploy data, replace with previous year
+```{r}
+UnemployData <- UnemployData %>% group_by(FIPS) %>% arrange(Year) %>% fill("Unemployment_Rate", .direction="down")
+```
+
+#For early Missing unemploy data, replace with earliest year of data
+```{r}
+UnemployData <- UnemployData %>% group_by(FIPS) %>% arrange(Year) %>% fill("Unemployment_Rate", .direction="up")
+```
+
+#Calculate rate for all NYC boroughs and tag as Manhattan
+```{r}
+NYCUnemp <- filter(UnemployData, FIPS %in% c('36005', '36047', '36061', '36081', '36085'))
+NYCUnemp$Year <- as.character(NYCUnemp$Year)
+NYCUnemp$FIPS <- as.numeric(NYCUnemp$FIPS)
+NYCUnemp$Unemployment_Rate <- as.numeric(NYCUnemp$Unemployment_Rate)
+NYCUnemp <- left_join(NYCUnemp, NYC_totals, by = c("FIPS", "Year"))
+
+NYCUnemp$UnempCount <- NYCUnemp$Unemployment_Rate*NYCUnemp$Total/100.0
+NYCUnempTot <- NYCUnemp %>% group_by(Year) %>% summarize_all(sum)
+NYCUnempTot <- ungroup(NYCUnempTot)
+NYCUnempTot$Unemployment_Rate <- NYCUnempTot$UnempCount/NYCUnempTot$Total*100.0
+NYCUnempTot <- mutate(NYCUnempTot, FIPS = '36061')
+NYCUnempTot$Total <- NULL
+NYCUnempTot$UnempCount <- NULL
+NYCUnempTot$NYCUnemp <- NYCUnempTot$Unemployment_Rate
+NYCUnempTot$Unemployment_Rate <- NULL
+NYCUnempTot$Year <- as.numeric(NYCUnempTot$Year)
+
+UnemployData$Year <- as.numeric(UnemployData$Year)
+UnemployData <- left_join(UnemployData, NYCUnempTot, by = c("Year", "FIPS"))
+
+UnemployData$Unemployment_Rate <- ifelse(is.na(UnemployData$NYCUnemp), UnemployData$Unemployment_Rate, UnemployData$NYCUnemp)
+UnemployData$NYCUnemp <- NULL
+```
+
+#Add one to year for time-lag approach
+```{r}
+
+UnemployData$Year <- UnemployData$Year + 1
+
+```
+
+#Join unemployment data
+```{r}
+UnemployData$Year <- as.character(UnemployData$Year)
+JailMortalityData <- left_join(JailMortalityData, UnemployData, by = c("FIPS", "Year"))
+JailMortalityData$Unemployment_Rate <- as.numeric(JailMortalityData$Unemployment_Rate)
+```
+
+
+#Read in party control of legislature data
+```{r}
+PartyData <- read_csv("./Confounder Data/Party control of state legislature.csv")
+```
+
+#Add one to year for time-lag approach
+```{r}
+
+PartyData$Year <- PartyData$Year + 1
+
+```
+#Join Party data
+```{r}
+PartyData$Year <- as.character(PartyData$Year)
+colnames(PartyData)[colnames(PartyData)=="State Abbreviation"] <- "state"
+JailMortalityData <- left_join(JailMortalityData, PartyData, by = c("state", "Year"))
+
+```
+
+#Read in state incarceration data
+```{r}
+StatePrisonData <- read_csv("./Confounder Data/State Prison Rates_to join.csv")
+```
+
+#For Missing state prison data, replace with previous year
+```{r}
+StatePrisonData <- StatePrisonData %>% group_by(STATEID) %>% arrange(Year) %>% fill("CUSTRATE", .direction="down")
+```
+
+#Add one to year for time-lag approach
+```{r}
+
+StatePrisonData$Year <- StatePrisonData$Year + 1
+
+```
+
+#Join State Prison data
+```{r}
+StatePrisonData$Year <- as.character(StatePrisonData$Year)
+colnames(StatePrisonData)[colnames(StatePrisonData)=="State Abbreviation"] <- "state"
+JailMortalityData <- left_join(JailMortalityData, StatePrisonData, by = c("state", "Year"))
+
+```
+
+#Additional data cleaning of joined file
+```{r}
+#cleanup poverty variable names
+names(JailMortalityData)[names(JailMortalityData) == "All Ages in Poverty Percent"] <- "PovertyRate"
+
+#Replace missing values in crime data
+JailMortalityData$TotalCrime <- ifelse(JailMortalityData$TotalCrime==3229992, NA, JailMortalityData$TotalCrime)
+
+#create rate variables for crime (per 10,000)
+JailMortalityData$TotalCrime_rate <- ifelse(JailMortalityData$total_pop>0, (JailMortalityData$TotalCrime/JailMortalityData$total_pop)*10000, NA)
+```
+
+
+#Create region variable
+```{r}
+JailMortalityData$Region <- ifelse(JailMortalityData$state %in% c("CT", "MA", "ME", "NH", "RI", "VT"), 1, ifelse(JailMortalityData$state %in% c("NJ", "NY", "PA"), 2, ifelse(JailMortalityData$state %in% c("IN", "IL", "MI", "OH", "WI"), 3, ifelse(JailMortalityData$state %in% c("IA", "KS", "MN", "MO", "NE", "ND", "SD"), 4, ifelse(JailMortalityData$state %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"), 5, ifelse(JailMortalityData$state %in% c("AL", "KY", "MS", "TN"), 6, ifelse(JailMortalityData$state %in% c("AR", "LA", "OK", "TX"), 7, ifelse(JailMortalityData$state %in% c("AZ", "CO", "ID", "NM", "MT", "UT", "NV", "WY"), 8, ifelse(JailMortalityData$state %in% c("AK", "CA", "HI", "OR", "WA"), 9, NA)))))))))
+
+```
+
+#Pull median age
+```{r}
+load("./denom_data.Rdata")
+#delete race columns
+med <- denom_data %>% select(-c(RaceEth, GrpTotal))
+med <- distinct(med)
+JailMortalityData <- JailMortalityData %>%   left_join(select(med, Year, FIPS, MedianAge), by = c("Year", "FIPS"))
+```
+
+#Create Black Percent County
+```{r}
+#For early years
+denom_data1 <- subset(denom_data,RaceEth=="Black_county")
+denom_data1$Percent_Black_county <- (denom_data1$GrpTotal/denom_data1$CountyTotal)*100
+denom_data1 <- denom_data1 %>% select(-c(RaceEth))
+
+#For later years
+denom_data2 <- subset(denom_data, RaceEth=="Lat.Black_county" | RaceEth == "NonLat.Black_county")
+denom_data2 <- denom_data2 %>% select(-c(RaceEth))
+denom_data2 <- denom_data2 %>% group_by(Year, FIPS, CountyTotal, MedianAge) %>% summarize_all(sum)
+denom_data2$Percent_Black_county <- (denom_data2$GrpTotal/denom_data2$CountyTotal)*100
+denom_data2 <- denom_data2[,c(1,2,5,3,4,6)]
+
+denom_data3 <- bind_rows(denom_data1, denom_data2)
+
+JailMortalityData <- JailMortalityData %>%   left_join(select(denom_data3, Year, FIPS, Percent_Black_county), by = c("Year", "FIPS"))
+```
+
+#Create abridged dataframe with key variables
+```{r}
+AnalysisData <- JailMortalityData[,c("Year", "FIPS", "total_pop", "MedianAge", "County_ADPRate", "Percent_Black_county", "Deaths", "Population", "PovertyRate", "TotalCrime_rate", "Unemployment_Rate", "Party", "CUSTRATE", "CancerDeaths","CerebroDeaths","LwrRspDeaths","DiabDeaths", "SubUseDisDeaths", "HeartDeaths", "SuicDeaths","UnintInjDeaths", "InfectDeaths", "urbanicity", "total_jail_pop")]
+
+```
+
+
+#Filter out counties that are only in the dataset once
+```{r}
+AnalysisData <- AnalysisData %>% group_by(FIPS) %>% filter(n() > 1)
+AnalysisData <- ungroup(AnalysisData)
+```
+
+
+#Turn Party Control of Leg into String
+```{r}
+AnalysisData$Party <- as.character(AnalysisData$Party)
+```
+
+#Create quartile category for ADP Rate
+```{r}
+library(gtools)
+AnalysisData$ADPcat <- quantcut(AnalysisData$County_ADPRate, 4)
+levels(AnalysisData$ADPcat) <- 1:4
+
+```
+
+
+#Plot jail incarceration data
+```{r}
+test <- AnalysisData  %>% select(c(Year, total_pop, total_jail_pop)) %>% group_by(Year) %>% summarize_all(sum, na.rm=TRUE) 
+test$jailrate <- test$total_jail_pop/test$total_pop*100000
+```
+
+```{r}
+library(ggthemes)
+library(directlabels)
+png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 2_plot jail data.png", res = 600, width = 9, height = 4, units = "in")
+
+ggplot(data = subset(test, Year %in% c(1987:2017)), aes(x=Year, y=jailrate, group=1)) +
+  geom_line() +
+  theme_tufte() +
+  ylab("Jail Incarceration Rate (per 100,000)") +
+  scale_x_discrete(breaks = pretty(as.numeric(rev(test$Year)), n = 15)) +
+  coord_cartesian(clip = 'off') +
+  theme(
+    text = element_text(size=15),
+    legend.position = "none",
+          plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm")
+  )
+
+```
+
+
+#Plot mortality data
+```{r}
+test <- AnalysisData  %>% select(c(Year, Population, CancerDeaths:InfectDeaths)) %>% group_by(Year) %>% summarize_all(sum, na.rm=TRUE) 
+test$Year <- as.numeric(test$Year) + 1
+test$Year <- as.factor(test$Year)
+test_long <- gather(test, cause, deaths, CancerDeaths:InfectDeaths, factor_key=TRUE)
+test_long$rate <- test_long$deaths/test_long$Population*100000
+test_long$label <- ifelse(test_long$cause == "CancerDeaths", "Malignant neoplasm", ifelse(test_long$cause == "CerebroDeaths", "Cerebrovascular disease", ifelse(test_long$cause == "LwrRspDeaths", "Chronic lower respiratory disease", ifelse(test_long$cause == "DiabDeaths", "Diabetes", ifelse(test_long$cause == "SubUseDisDeaths", "Substance-induced", ifelse(test_long$cause == "HeartDeaths", "Heart disease", ifelse(test_long$cause == "SuicDeaths", "Suicide", ifelse(test_long$cause == "UnintInjDeaths", "Unintentional injury", ifelse(test_long$cause == "InfectDeaths","Infectious disease", NA)))))))))
+```
+
+
+```{r}
+library(ggthemes)
+library(directlabels)
+png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 3_plot mortality data.png", res = 600, width = 11, height = 4, units = "in")
+test_long <- test_long %>% filter(Year %in% c(1988:2018))
+ggplot(data = test_long, aes(x=Year, y=rate, color=cause, group=cause)) +
+  geom_line() +
+  geom_dl(aes(label = label), method = list("last.bumpup", fontfamily="serif", cex=.9, vjust=2))+
+  theme_tufte() +
+  ylab("Mortality Rate (per 100,000)") +
+  scale_x_discrete(breaks=c("1988","1990","1992","1994","1996","1998","2000","2002","2004","2006","2008","2010","2012","2014","2016"))+
+  coord_cartesian(clip = 'off') +
+  theme(
+    text = element_text(size=14),
+    legend.position = "none",
+          plot.margin = margin(0.1, 5, 0.1, 0.1, "cm")
+  )
+
+```
+
+
+##Analysis
+```{r}
+library(broom)
+```
+
+
+#MORTALITY LAGS
+## 5 years
+#Subtract 4 more years for time-lag approach
+```{r}
+Mortality5 <- MortalityData
+colnames(Mortality5)[3:24] <- paste(colnames(Mortality5)[3:24], "5", sep = "_")
+Mortality5$Year <- as.numeric(Mortality5$Year)
+Mortality5$Year <- Mortality5$Year - 4
+
+```
+#Join mortality data
+```{r}
+
+Mortality5$FIPS <- as.character(Mortality5$FIPS)
+Mortality5$Year <- as.character(Mortality5$Year)
+Mortality5 <- Mortality5 %>% select("FIPS","Year","Deaths_5","Population_5","CancerDeaths_5","CerebroDeaths_5","LwrRspDeaths_5","DiabDeaths_5","SubUseDisDeaths_5","HeartDeaths_5","SuicDeaths_5","UnintInjDeaths_5", "InfectDeaths_5")
+
+AnalysisData <- left_join(AnalysisData, Mortality5, by = c("FIPS", "Year"))
+
+```
+
+## 10 years
+#Subtract 9 more years for time-lag approach
+```{r}
+Mortality10 <- MortalityData
+colnames(Mortality10)[3:24] <- paste(colnames(Mortality10)[3:24], "10", sep = "_")
+Mortality10$Year <- as.numeric(Mortality10$Year)
+Mortality10$Year <- Mortality10$Year - 9
+
+```
+#Join mortality data
+```{r}
+Mortality10$FIPS <- as.character(Mortality10$FIPS)
+Mortality10$Year <- as.character(Mortality10$Year)
+Mortality10 <- Mortality10 %>% select("FIPS","Year","Deaths_10","Population_10","CancerDeaths_10","CerebroDeaths_10","LwrRspDeaths_10","DiabDeaths_10","SubUseDisDeaths_10","HeartDeaths_10","SuicDeaths_10","UnintInjDeaths_10", "InfectDeaths_10")
+
+AnalysisData <- left_join(AnalysisData, Mortality10, by = c("FIPS", "Year"))
+
+```
+
+
+# CONTINUOUS
+```{r}
+#Unit of exposure: 0.1 percentage point increase, change ADP to per 1000
+AnalysisData$ADPper1000 <- AnalysisData$County_ADPRate
+```
+
+```{r}
+#One-year lag
+## Substance Use
+Substance1 <- glm(SubUseDisDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Suicide
+Suic1 <- glm(SuicDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Cancer
+Cancer1 <- glm(CancerDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro1 <- glm(CerebroDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp1 <- glm(LwrRspDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Diabetes
+Diab1 <- glm(DiabDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Heart Disease
+Heart1 <- glm(HeartDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj1 <- glm(UnintInjDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+
+## Infectious disease
+Infect1 <- glm(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=AnalysisData, family=quasipoisson)
+```
+
+
+```{r}
+#Five-year lag
+## Substance Use
+Substance5 <- glm(SubUseDisDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Suicide
+Suic5 <- glm(SuicDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Cancer
+Cancer5 <- glm(CancerDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro5 <- glm(CerebroDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp5 <- glm(LwrRspDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Diabetes
+Diab5 <- glm(DiabDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Heart Disease
+Heart5 <- glm(HeartDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj5 <- glm(UnintInjDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+
+## Infectious disease
+Infect5 <- glm(InfectDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=AnalysisData, family=quasipoisson)
+```
+
+```{r}
+#Ten-year lag
+## Substance Use
+Substance10 <- glm(SubUseDisDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Suicide
+Suic10 <- glm(SuicDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Cancer
+Cancer10 <- glm(CancerDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro10 <- glm(CerebroDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp10 <- glm(LwrRspDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Diabetes
+Diab10 <- glm(DiabDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Heart Disease
+Heart10 <- glm(HeartDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj10 <- glm(UnintInjDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+
+## Infectious disease
+Infect10 <- glm(InfectDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=AnalysisData, family=quasipoisson)
+```
+
+#Code for figure
+## Substance
+
+```{r}
+ADP <- quantile(AnalysisData$ADPper1000, probs = seq(0,1,.001), na.rm=TRUE)
+#one-year-lag
+datasub <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2017", 
+                    FIPS = "36061", 
+                    Population = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesub <- predict(Substance1, newdata=datasub, type="response")
+
+pred_ratesub <- cbind(datasub, ratesub)
+
+plot_pred_ratesub1 <- pred_ratesub %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  mutate(COD = "Substance-induced", Lag = "One-year")
+
+#5-year-lag
+datasub <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2013", 
+                    FIPS = "36061", 
+                    Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesub <- predict(Substance5, newdata=datasub, type="response")
+
+pred_ratesub <- cbind(datasub, ratesub)
+
+plot_pred_ratesub5 <- pred_ratesub %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  mutate(COD = "Substance-induced", Lag = "Five-year")
+
+#10-year-lag
+datasub <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2008", 
+                    FIPS = "36061", 
+                    Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesub <- predict(Substance10, newdata=datasub, type="response")
+
+pred_ratesub <- cbind(datasub, ratesub)
+
+plot_pred_ratesub10 <- pred_ratesub %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  mutate(COD = "Substance-induced", Lag = "Ten-year")
+```
+
+
+## Suicide
+
+```{r}
+ADP <- quantile(AnalysisData$ADPper1000, probs = seq(0,1,.001), na.rm=TRUE)
+#one-year-lag
+datasui <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2017", 
+                    FIPS = "36061", 
+                    Population = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesui <- predict(Suic1, newdata=datasui, type="response")
+
+pred_ratesui <- cbind(datasui, ratesui)
+
+plot_pred_ratesui1 <- pred_ratesui %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  mutate(COD = "Suicide", Lag="One-year")
+
+#five-year-lag
+datasui <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2013", 
+                    FIPS = "36061", 
+                    Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesui <- predict(Suic5, newdata=datasui, type="response")
+
+pred_ratesui <- cbind(datasui, ratesui)
+
+plot_pred_ratesui5 <- pred_ratesui %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  mutate(COD = "Suicide", Lag="Five-year")
+
+#ten-year-lag
+datasui <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2008", 
+                    FIPS = "36061", 
+                    Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratesui <- predict(Suic10, newdata=datasui, type="response")
+
+pred_ratesui <- cbind(datasui, ratesui)
+
+plot_pred_ratesui10 <- pred_ratesui %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  mutate(COD = "Suicide", Lag="Ten-year")
+```
+
+
+## Lower Respiratory
+
+```{r}
+ADP <- quantile(AnalysisData$ADPper1000, probs = seq(0,1,.001), na.rm=TRUE)
+#one-year lag
+datalwr <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2017", 
+                    FIPS = "36061", 
+                    Population = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratelwr <- predict(LwrRsp1, newdata=datalwr, type="response")
+
+pred_ratelwr <- cbind(datalwr, ratelwr)
+
+plot_pred_ratelwr1 <- pred_ratelwr %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  mutate(COD = "Chronic lower respiratory disease", Lag="One-year")
+
+#five-year lag
+datalwr <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2013", 
+                    FIPS = "36061", 
+                    Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratelwr <- predict(LwrRsp5, newdata=datalwr, type="response")
+
+pred_ratelwr <- cbind(datalwr, ratelwr)
+
+plot_pred_ratelwr5 <- pred_ratelwr %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  mutate(COD = "Chronic lower respiratory disease", Lag="Five-year")
+
+#ten-year lag
+datalwr <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2008", 
+                    FIPS = "36061", 
+                    Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+ratelwr <- predict(LwrRsp10, newdata=datalwr, type="response")
+
+pred_ratelwr <- cbind(datalwr, ratelwr)
+
+plot_pred_ratelwr10 <- pred_ratelwr %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  mutate(COD = "Chronic lower respiratory disease", Lag="Ten-year")
+```
+
+
+## Infectious Disease
+
+```{r}
+ADP <- quantile(AnalysisData$ADPper1000, probs = seq(0,1,.001), na.rm=TRUE)
+#one-year lag
+datainf <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2017", 
+                    FIPS = "36061", 
+                    Population = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+rateinf <- predict(Infect1, newdata=datainf, type="response")
+
+pred_rateinf <- cbind(datainf, rateinf)
+
+plot_pred_rateinf1 <- pred_rateinf %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  mutate(COD = "Infectious disease", Lag="One-year")
+
+#five-year lag
+datainf <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2013", 
+                    FIPS = "36061", 
+                    Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+rateinf <- predict(Infect5, newdata=datainf, type="response")
+
+pred_rateinf <- cbind(datainf, rateinf)
+
+plot_pred_rateinf5 <- pred_rateinf %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  mutate(COD = "Infectious disease", Lag="Five-year")
+
+#ten-year lag
+datainf <- expand.grid(ADPper1000 = ADP, 
+                    PovertyRate = mean(AnalysisData$PovertyRate, na.rm=TRUE), 
+                    TotalCrime_rate = mean(AnalysisData$TotalCrime_rate, na.rm=TRUE),
+                    Percent_Black_county = mean(AnalysisData$Percent_Black_county, na.rm=TRUE),
+                    MedianAge = 8, 
+                    Unemployment_Rate = mean(AnalysisData$Unemployment_Rate, na.rm=TRUE),
+                    Party = c('1','2','3'), 
+                    CUSTRATE = mean(AnalysisData$CUSTRATE, na.rm=TRUE),
+                    Year = "2008", 
+                    FIPS = "36061", 
+                    Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
+)
+
+rateinf <- predict(Infect10, newdata=datainf, type="response")
+
+pred_rateinf <- cbind(datainf, rateinf)
+
+plot_pred_rateinf10 <- pred_rateinf %>% 
+  group_by(ADPper1000) %>% 
+  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  mutate(COD = "Infectious disease", Lag="Ten-year")
+```
+
+## Combine
+
+```{r}
+plotdata <- rbind(plot_pred_ratelwr1, plot_pred_ratelwr5, plot_pred_ratelwr10, plot_pred_ratesub1, plot_pred_ratesub5, plot_pred_ratesub10, plot_pred_ratesui1, plot_pred_ratesui5, plot_pred_ratesui10, plot_pred_rateinf1, plot_pred_rateinf5, plot_pred_rateinf10)
+
+plotdata$COD <- factor(plotdata$COD, levels=c("Chronic lower respiratory disease", "Substance-induced", "Suicide", "Infectious disease"))
+plotdata$Lag <- factor(plotdata$Lag, levels=c("One-year","Five-year","Ten-year"))
+
+plotdata$`Cause of Death` <- plotdata$COD
+```
+
+
+
+
+```{r}
+mycolors8<- scales::hue_pal()(8) 
+library(ggthemes)
+
+png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/PredictedCurvCOD_7-30-20.png", res = 600, width = 6, height = 4, units = "in")
+
+ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`, group=Lag)) +
+  geom_line(aes(color = Lag)) +
+  facet_wrap( ~ `Cause of Death`, scales="free") +
+  theme_tufte() +
+   theme(
+    panel.background = element_blank(),
+    legend.key = element_blank(),
+    axis.text.x = element_text(size=10),
+    axis.text.y = element_text(size=10),
+    axis.title = element_text(size=10),
+    panel.grid = element_blank()) +
+  xlab("\nJail Incarceration Rate (per 1,000)") +
+  ylab("Predicted Mortality Rate (per 100,000)\n") 
+dev.off()
+```
+
+#RANDOM INTERCEPT - Sensitivity Analysis
+```{r}
+library(lme4)
+#One-year lag
+## Substance Use
+rSubstance1 <- glmer(SubUseDisDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Suicide
+rSuic1 <- glmer(SuicDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Cancer
+rCancer1 <- glmer(CancerDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year +(1|FIPS)+ offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Cerebrovascular
+rCerebro1 <- glmer(CerebroDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Lower Respiratory
+rLwrRsp1 <- glmer(LwrRspDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Diabetes
+rDiab1 <- glmer(DiabDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Heart Disease
+rHeart1 <- glmer(HeartDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Unintentional Injury
+rUnintInj1 <- glmer(UnintInjDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+
+## Infectious disease
+rInfect1 <- glmer(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + (1|FIPS) + offset(log(Population)), data=AnalysisData, family=poisson)
+```
+
+
+#Sensitivity analysis with same outcome years for everyone: 1998-2018
+##One-year lag
+```{r}
+Sensitivity1 <- AnalysisData %>% filter(Year > "1995")
+Sensitivity5 <- AnalysisData %>% filter(Year > "1991" & Year < "2014")
+Sensitivity10 <- AnalysisData %>% filter(Year < "2009")
+```
+
+```{r}
+#One-year lag
+## Substance Use
+Substance1 <- glm(SubUseDisDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Suicide
+Suic1 <- glm(SuicDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Cancer
+Cancer1 <- glm(CancerDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro1 <- glm(CerebroDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp1 <- glm(LwrRspDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Diabetes
+Diab1 <- glm(DiabDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Heart Disease
+Heart1 <- glm(HeartDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj1 <- glm(UnintInjDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+
+## Infectious disease
+Infect1 <- glm(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=Sensitivity10, family=quasipoisson)
+```
+
+```{r}
+#Five-year lag
+## Substance Use
+Substance5 <- glm(SubUseDisDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Suicide
+Suic5 <- glm(SuicDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Cancer
+Cancer5 <- glm(CancerDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro5 <- glm(CerebroDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp5 <- glm(LwrRspDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Diabetes
+Diab5 <- glm(DiabDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Heart Disease
+Heart5 <- glm(HeartDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj5 <- glm(UnintInjDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+
+## Infectious disease
+Infect5 <- glm(InfectDeaths_5 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_5)), data=Sensitivity10, family=quasipoisson)
+```
+
+```{r}
+#Ten-year lag
+## Substance Use
+Substance10 <- glm(SubUseDisDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Suicide
+Suic10 <- glm(SuicDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Cancer
+Cancer10 <- glm(CancerDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro10 <- glm(CerebroDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp10 <- glm(LwrRspDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Diabetes
+Diab10 <- glm(DiabDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Heart Disease
+Heart10 <- glm(HeartDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj10 <- glm(UnintInjDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+
+## Infectious disease
+Infect10 <- glm(InfectDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+```
