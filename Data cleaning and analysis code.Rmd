@@ -31,8 +31,6 @@ JailAnalysisData <- JailAnalysisData %>% filter(year > 1986)
 #Create rate variables for jail stats relative to county pop
 ```{r}
 JailAnalysisData$County_ADPRate <- (JailAnalysisData$total_jail_pop/JailAnalysisData$total_pop)*1000
-JailAnalysisData$White_ConfinedRate <- (JailAnalysisData$white_jail_pop/JailAnalysisData$white_pop_15to64)*100
-JailAnalysisData$Black_ConfinedRate <-(JailAnalysisData$black_jail_pop/JailAnalysisData$black_pop_15to64)*100
 ```
 
 
@@ -68,7 +66,7 @@ NYC_totals <- bind_rows(NYC_totals, NYC_2010)
 
 ```
 
-#Create a list of all fips and all years in jaildata
+#Create a list of all fips and all years in jaildata (include 1986 because covariate data will begin in)
 ```{r}
 allfips <- unique(JailAnalysisData$fips)
 allyears <- 1986:2017
@@ -1114,7 +1112,7 @@ AnalysisData <- left_join(AnalysisData, Mortality10, by = c("FIPS", "Year"))
 
 # CONTINUOUS
 ```{r}
-#Unit of exposure: 0.1 percentage point increase, change ADP to per 1000
+#Unit of exposure: 1 per 1000 increase, clearly label var as per 1000
 AnalysisData$ADPper1000 <- AnalysisData$County_ADPRate
 ```
 
