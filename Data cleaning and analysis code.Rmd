@@ -916,12 +916,6 @@ JailMortalityData$TotalCrime_rate <- ifelse(JailMortalityData$total_pop>0, (Jail
 ```
 
 
-#Create region variable
-```{r}
-JailMortalityData$Region <- ifelse(JailMortalityData$state %in% c("CT", "MA", "ME", "NH", "RI", "VT"), 1, ifelse(JailMortalityData$state %in% c("NJ", "NY", "PA"), 2, ifelse(JailMortalityData$state %in% c("IN", "IL", "MI", "OH", "WI"), 3, ifelse(JailMortalityData$state %in% c("IA", "KS", "MN", "MO", "NE", "ND", "SD"), 4, ifelse(JailMortalityData$state %in% c("DE", "DC", "FL", "GA", "MD", "NC", "SC", "VA", "WV"), 5, ifelse(JailMortalityData$state %in% c("AL", "KY", "MS", "TN"), 6, ifelse(JailMortalityData$state %in% c("AR", "LA", "OK", "TX"), 7, ifelse(JailMortalityData$state %in% c("AZ", "CO", "ID", "NM", "MT", "UT", "NV", "WY"), 8, ifelse(JailMortalityData$state %in% c("AK", "CA", "HI", "OR", "WA"), 9, NA)))))))))
-
-```
-
 #Pull median age
 ```{r}
 load("./denom_data.Rdata")
@@ -977,29 +971,64 @@ levels(AnalysisData$ADPcat) <- 1:4
 
 ```
 
+#Assess how much each county changed over time period
+```{r}
+AssessChange <- AnalysisData %>% group_by(FIPS) %>% summarise(minjail = min(County_ADPRate), maxjail=max(County_ADPRate))
+AssessChange$change <- AssessChange$maxjail - AssessChange$minjail
+AssessChange$County_ADPRate <- AssessChange$minjail
+AssessChange <- AssessChange %>% left_join(select(AnalysisData, County_ADPRate, FIPS, Year), by=c("County_ADPRate", "FIPS"))
+AssessChange$minyear <- AssessChange$Year
+AssessChange$Year <- NULL
+AssessChange$County_ADPRate <- AssessChange$maxjail
+AssessChange <- AssessChange %>% left_join(select(AnalysisData, County_ADPRate, FIPS, Year), by=c("County_ADPRate", "FIPS"))
+AssessChange$maxyear <- AssessChange$Year
+AssessChange$Year <- "change"
+AssessChange$increase <- ifelse(AssessChange$maxyear > AssessChange$minyear, 1, -1)
+AssessChange$ChangeinVal <- AssessChange$change*AssessChange$increase
+forplot <- AssessChange %>% select(FIPS, Year, ChangeinVal)
+```
 
 #Plot jail incarceration data
 ```{r}
-test <- AnalysisData  %>% select(c(Year, total_pop, total_jail_pop)) %>% group_by(Year) %>% summarize_all(sum, na.rm=TRUE) 
-test$jailrate <- test$total_jail_pop/test$total_pop*100000
+Fig1 <- AnalysisData  %>% select(c(FIPS, Year, County_ADPRate))
 ```
 
 ```{r}
 library(ggthemes)
 library(directlabels)
-png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 2_plot jail data.png", res = 600, width = 9, height = 4, units = "in")
+library(gridExtra)
 
-ggplot(data = subset(test, Year %in% c(1987:2017)), aes(x=Year, y=jailrate, group=1)) +
-  geom_line() +
+
+png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 2_11-2.png", res = 600, width = 9, height = 6, units = "in")
+plot1 <- ggplot(data = Fig1, aes(x=Year, y=County_ADPRate)) +
+  geom_boxplot() +
   theme_tufte() +
-  ylab("Jail Incarceration Rate (per 100,000)") +
+  ylab("Jail incarceration rate (per 1,000)") +
   scale_x_discrete(breaks = pretty(as.numeric(rev(test$Year)), n = 15)) +
   coord_cartesian(clip = 'off') +
+  ggtitle("A") +
   theme(
-    text = element_text(size=15),
+    text = element_text(size=14),
     legend.position = "none",
-          plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm")
+          plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+    panel.background = element_rect(fill="lightgray",color="white")
   )
+plot2 <- ggplot(data = forplot, aes(x=Year, y=ChangeinVal)) +
+  geom_boxplot() +
+  theme_tufte() +
+  ylab("Maximum within-county change in jail incarceration rate") +
+  xlab(" ") +
+  scale_x_discrete(breaks = pretty(as.numeric(rev(test$Year)), n = 15)) +
+  coord_cartesian(clip = 'off') +
+  ggtitle("B")+
+  theme(
+    text = element_text(size=14),
+    legend.position = "none",
+          plot.margin = margin(0.1, 0.1, 0.1, 0.1, "cm"),
+    panel.background = element_rect(fill="lightgray",color="white")
+  )
+grid.arrange(plot1, plot2, ncol=2, widths = c(4, 1))
+
 
 ```
 
@@ -1010,7 +1039,7 @@ test <- AnalysisData  %>% select(c(Year, Population, CancerDeaths:InfectDeaths))
 test$Year <- as.numeric(test$Year) + 1
 test$Year <- as.factor(test$Year)
 test_long <- gather(test, cause, deaths, CancerDeaths:InfectDeaths, factor_key=TRUE)
-test_long$rate <- test_long$deaths/test_long$Population*100000
+test_long$rate <- test_long$deaths/test_long$Population*1000
 test_long$label <- ifelse(test_long$cause == "CancerDeaths", "Malignant neoplasm", ifelse(test_long$cause == "CerebroDeaths", "Cerebrovascular disease", ifelse(test_long$cause == "LwrRspDeaths", "Chronic lower respiratory disease", ifelse(test_long$cause == "DiabDeaths", "Diabetes", ifelse(test_long$cause == "SubUseDisDeaths", "Substance-induced", ifelse(test_long$cause == "HeartDeaths", "Heart disease", ifelse(test_long$cause == "SuicDeaths", "Suicide", ifelse(test_long$cause == "UnintInjDeaths", "Unintentional injury", ifelse(test_long$cause == "InfectDeaths","Infectious disease", NA)))))))))
 ```
 
@@ -1024,7 +1053,7 @@ ggplot(data = test_long, aes(x=Year, y=rate, color=cause, group=cause)) +
   geom_line() +
   geom_dl(aes(label = label), method = list("last.bumpup", fontfamily="serif", cex=.9, vjust=2))+
   theme_tufte() +
-  ylab("Mortality Rate (per 100,000)") +
+  ylab("Mortality Rate (per 1,000)") +
   scale_x_discrete(breaks=c("1988","1990","1992","1994","1996","1998","2000","2002","2004","2006","2008","2010","2012","2014","2016"))+
   coord_cartesian(clip = 'off') +
   theme(
@@ -1199,13 +1228,17 @@ datasub <- expand.grid(ADPper1000 = ADP,
                     Population = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesub <- predict(Substance1, newdata=datasub, type="response")
+ratesub <- data.frame(predict(Substance1, newdata=datasub, type="response", se.fit=TRUE))
+ratesub$lwr <- ratesub$fit-1.96*ratesub$se.fit
+ratesub$upr <- ratesub$fit+1.96*ratesub$se.fit
+ratesub$se.fit <- NULL
+ratesub$residual.scale <- NULL
 
 pred_ratesub <- cbind(datasub, ratesub)
 
 plot_pred_ratesub1 <- pred_ratesub %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Substance-induced", Lag = "One-year")
 
 #5-year-lag
@@ -1222,13 +1255,17 @@ datasub <- expand.grid(ADPper1000 = ADP,
                     Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesub <- predict(Substance5, newdata=datasub, type="response")
+ratesub <- data.frame(predict(Substance5, newdata=datasub, type="response", se.fit=TRUE))
+ratesub$lwr <- ratesub$fit-1.96*ratesub$se.fit
+ratesub$upr <- ratesub$fit+1.96*ratesub$se.fit
+ratesub$se.fit <- NULL
+ratesub$residual.scale <- NULL
 
 pred_ratesub <- cbind(datasub, ratesub)
 
 plot_pred_ratesub5 <- pred_ratesub %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Substance-induced", Lag = "Five-year")
 
 #10-year-lag
@@ -1245,13 +1282,17 @@ datasub <- expand.grid(ADPper1000 = ADP,
                     Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesub <- predict(Substance10, newdata=datasub, type="response")
+ratesub <- data.frame(predict(Substance10, newdata=datasub, type="response", se.fit=TRUE))
+ratesub$lwr <- ratesub$fit-1.96*ratesub$se.fit
+ratesub$upr <- ratesub$fit+1.96*ratesub$se.fit
+ratesub$se.fit <- NULL
+ratesub$residual.scale <- NULL
 
 pred_ratesub <- cbind(datasub, ratesub)
 
 plot_pred_ratesub10 <- pred_ratesub %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesub, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Substance-induced", Lag = "Ten-year")
 ```
 
@@ -1274,13 +1315,17 @@ datasui <- expand.grid(ADPper1000 = ADP,
                     Population = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesui <- predict(Suic1, newdata=datasui, type="response")
+ratesui <- data.frame(predict(Suic1, newdata=datasui, type="response", se.fit=TRUE))
+ratesui$lwr <- ratesui$fit-1.96*ratesui$se.fit
+ratesui$upr <- ratesui$fit+1.96*ratesui$se.fit
+ratesui$se.fit <- NULL
+ratesui$residual.scale <- NULL
 
 pred_ratesui <- cbind(datasui, ratesui)
 
 plot_pred_ratesui1 <- pred_ratesui %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Suicide", Lag="One-year")
 
 #five-year-lag
@@ -1297,13 +1342,17 @@ datasui <- expand.grid(ADPper1000 = ADP,
                     Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesui <- predict(Suic5, newdata=datasui, type="response")
+ratesui <- data.frame(predict(Suic5, newdata=datasui, type="response", se.fit=TRUE))
+ratesui$lwr <- ratesui$fit-1.96*ratesui$se.fit
+ratesui$upr <- ratesui$fit+1.96*ratesui$se.fit
+ratesui$se.fit <- NULL
+ratesui$residual.scale <- NULL
 
 pred_ratesui <- cbind(datasui, ratesui)
 
 plot_pred_ratesui5 <- pred_ratesui %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Suicide", Lag="Five-year")
 
 #ten-year-lag
@@ -1320,13 +1369,17 @@ datasui <- expand.grid(ADPper1000 = ADP,
                     Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratesui <- predict(Suic10, newdata=datasui, type="response")
+ratesui <- data.frame(predict(Suic10, newdata=datasui, type="response", se.fit=TRUE))
+ratesui$lwr <- ratesui$fit-1.96*ratesui$se.fit
+ratesui$upr <- ratesui$fit+1.96*ratesui$se.fit
+ratesui$se.fit <- NULL
+ratesui$residual.scale <- NULL
 
 pred_ratesui <- cbind(datasui, ratesui)
 
 plot_pred_ratesui10 <- pred_ratesui %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratesui, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Suicide", Lag="Ten-year")
 ```
 
@@ -1349,13 +1402,17 @@ datalwr <- expand.grid(ADPper1000 = ADP,
                     Population = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratelwr <- predict(LwrRsp1, newdata=datalwr, type="response")
+ratelwr <- data.frame(predict(LwrRsp1, newdata=datalwr, type="response", se.fit=TRUE))
+ratelwr$lwr <- ratelwr$fit-1.96*ratelwr$se.fit
+ratelwr$upr <- ratelwr$fit+1.96*ratelwr$se.fit
+ratelwr$se.fit <- NULL
+ratelwr$residual.scale <- NULL
 
 pred_ratelwr <- cbind(datalwr, ratelwr)
 
 plot_pred_ratelwr1 <- pred_ratelwr %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Chronic lower respiratory disease", Lag="One-year")
 
 #five-year lag
@@ -1372,13 +1429,17 @@ datalwr <- expand.grid(ADPper1000 = ADP,
                     Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratelwr <- predict(LwrRsp5, newdata=datalwr, type="response")
+ratelwr <- data.frame(predict(LwrRsp5, newdata=datalwr, type="response", se.fit=TRUE))
+ratelwr$lwr <- ratelwr$fit-1.96*ratelwr$se.fit
+ratelwr$upr <- ratelwr$fit+1.96*ratelwr$se.fit
+ratelwr$se.fit <- NULL
+ratelwr$residual.scale <- NULL
 
 pred_ratelwr <- cbind(datalwr, ratelwr)
 
 plot_pred_ratelwr5 <- pred_ratelwr %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Chronic lower respiratory disease", Lag="Five-year")
 
 #ten-year lag
@@ -1395,13 +1456,17 @@ datalwr <- expand.grid(ADPper1000 = ADP,
                     Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-ratelwr <- predict(LwrRsp10, newdata=datalwr, type="response")
+ratelwr <- data.frame(predict(LwrRsp10, newdata=datalwr, type="response", se.fit=TRUE))
+ratelwr$lwr <- ratelwr$fit-1.96*ratelwr$se.fit
+ratelwr$upr <- ratelwr$fit+1.96*ratelwr$se.fit
+ratelwr$se.fit <- NULL
+ratelwr$residual.scale <- NULL
 
 pred_ratelwr <- cbind(datalwr, ratelwr)
 
 plot_pred_ratelwr10 <- pred_ratelwr %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(ratelwr, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Chronic lower respiratory disease", Lag="Ten-year")
 ```
 
@@ -1424,13 +1489,17 @@ datainf <- expand.grid(ADPper1000 = ADP,
                     Population = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-rateinf <- predict(Infect1, newdata=datainf, type="response")
+rateinf <- data.frame(predict(Infect1, newdata=datainf, type="response", se.fit=TRUE))
+rateinf$lwr <- rateinf$fit-1.96*rateinf$se.fit
+rateinf$upr <- rateinf$fit+1.96*rateinf$se.fit
+rateinf$se.fit <- NULL
+rateinf$residual.scale <- NULL
 
 pred_rateinf <- cbind(datainf, rateinf)
 
 plot_pred_rateinf1 <- pred_rateinf %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Infectious disease", Lag="One-year")
 
 #five-year lag
@@ -1447,13 +1516,17 @@ datainf <- expand.grid(ADPper1000 = ADP,
                     Population_5 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-rateinf <- predict(Infect5, newdata=datainf, type="response")
+rateinf <- data.frame(predict(Infect5, newdata=datainf, type="response", se.fit=TRUE))
+rateinf$lwr <- rateinf$fit-1.96*rateinf$se.fit
+rateinf$upr <- rateinf$fit+1.96*rateinf$se.fit
+rateinf$se.fit <- NULL
+rateinf$residual.scale <- NULL
 
 pred_rateinf <- cbind(datainf, rateinf)
 
 plot_pred_rateinf5 <- pred_rateinf %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Infectious disease", Lag="Five-year")
 
 #ten-year lag
@@ -1470,13 +1543,17 @@ datainf <- expand.grid(ADPper1000 = ADP,
                     Population_10 = mean(AnalysisData$Population, na.rm=TRUE)
 )
 
-rateinf <- predict(Infect10, newdata=datainf, type="response")
+rateinf <- data.frame(predict(Infect10, newdata=datainf, type="response", se.fit=TRUE))
+rateinf$lwr <- rateinf$fit-1.96*rateinf$se.fit
+rateinf$upr <- rateinf$fit+1.96*rateinf$se.fit
+rateinf$se.fit <- NULL
+rateinf$residual.scale <- NULL
 
 pred_rateinf <- cbind(datainf, rateinf)
 
 plot_pred_rateinf10 <- pred_rateinf %>% 
   group_by(ADPper1000) %>% 
-  summarise("Predicted Rate" = mean(rateinf, na.rm=TRUE)) %>% 
+  summarise("Predicted Rate" = mean(fit, na.rm=TRUE), "LCL" = mean(lwr, na.rm=TRUE), "UCL" =mean(upr, na.rm=TRUE)) %>% 
   mutate(COD = "Infectious disease", Lag="Ten-year")
 ```
 
@@ -1498,10 +1575,11 @@ plotdata$`Cause of Death` <- plotdata$COD
 mycolors8<- scales::hue_pal()(8) 
 library(ggthemes)
 
-png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/PredictedCurvCOD_7-30-20.png", res = 600, width = 6, height = 4, units = "in")
+png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/PredictedCurvCOD_10-29-20.png", res = 600, width = 6, height = 4, units = "in")
 
-ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`, group=Lag)) +
+ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`/mean(AnalysisData$Population, na.rm=TRUE)*1000, group=Lag)) +
   geom_line(aes(color = Lag)) +
+  geom_ribbon(aes(ymin=LCL/mean(AnalysisData$Population, na.rm=TRUE)*1000,ymax=UCL/mean(AnalysisData$Population, na.rm=TRUE)*1000, fill=Lag),alpha=0.2) +
   facet_wrap( ~ `Cause of Death`, scales="free") +
   theme_tufte() +
    theme(
@@ -1512,7 +1590,7 @@ ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`, group=Lag)) +
     axis.title = element_text(size=10),
     panel.grid = element_blank()) +
   xlab("\nJail Incarceration Rate (per 1,000)") +
-  ylab("Predicted Mortality Rate (per 100,000)\n") 
+  ylab("Predicted Mortality Rate (per 1,000)\n") 
 dev.off()
 ```
 
@@ -1550,10 +1628,7 @@ rInfect1 <- glmer(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Pe
 
 
 #Sensitivity analysis with same outcome years for everyone: 1998-2018
-##One-year lag
 ```{r}
-Sensitivity1 <- AnalysisData %>% filter(Year > "1995")
-Sensitivity5 <- AnalysisData %>% filter(Year > "1991" & Year < "2014")
 Sensitivity10 <- AnalysisData %>% filter(Year < "2009")
 ```
 
