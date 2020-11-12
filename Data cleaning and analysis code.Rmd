@@ -1836,7 +1836,7 @@ UnintInj10 <- glm(UnintInjDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate
 Infect10 <- glm(InfectDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
 ```
 
-#Replacing Suppressed Values - Sensativity Analysis
+#Replacing Suppressed Values - Sensitivity Analysis
 ##Replace all missing mortality counts with 0
 ```{r}
 SensSuppr0 <- AnalysisData
