@@ -20,7 +20,7 @@ library(openxlsx)
 #Read in Vera Institute of Justice Incarceration Trends data
 ```{r}
 #Downloaded from Vera Incarceration Trends GitHub: https://github.com/vera-institute/incarceration-trends
-JailAnalysisData <- read.xlsx("~/incarceration_trends.xlsx")
+JailAnalysisData <- read.xlsx("./incarceration_trends.xlsx")
 ```
 
 #Limit data set to 1987-2017
@@ -251,6 +251,115 @@ MortalityData$Year <- as.character(MortalityData$Year)
 
 JailMortalityData <- left_join(JailAnalysisData, MortalityData, by = c("FIPS", "Year"))
 
+```
+
+#Create table of FIPS x Year to check missingness and drop counties if missing all data for a cause of death
+##Substance Use Disorder
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, SubUseDisDeaths)
+tb_wide <- spread(tb, Year, SubUseDisDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Substance Use Disorder deaths
+dropfips <- tb_wide %>% filter(na_count == 31 | na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Infectious Disease
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, InfectDeaths)
+tb_wide <- spread(tb, Year, InfectDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Infectious deaths
+dropfips <- tb_wide %>% filter(na_count == 31 | na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Suicide
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, SuicDeaths)
+tb_wide <- spread(tb, Year, SuicDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Suicide deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Diabetes
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, DiabDeaths)
+tb_wide <- spread(tb, Year, DiabDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Diabetes deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Cerebro
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, CerebroDeaths)
+tb_wide <- spread(tb, Year, CerebroDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Cerebro deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Chronic Lower resp
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, LwrRspDeaths)
+tb_wide <- spread(tb, Year, LwrRspDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Chronic lower resp deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Injury
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, UnintInjDeaths)
+tb_wide <- spread(tb, Year, UnintInjDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Injury deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Heart disease
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, HeartDeaths)
+tb_wide <- spread(tb, Year, HeartDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Heart disease deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
+```
+
+##Cancer
+```{r}
+tb <- JailMortalityData %>% select(FIPS, Year, CancerDeaths)
+tb_wide <- spread(tb, Year, CancerDeaths)
+tb_wide$na_count <- apply(tb_wide, 1, function(x) sum(is.na(x)))
+table(tb_wide$na_count)
+#drop counties from analysis if missing all data for Cancer deaths
+dropfips <- tb_wide %>% filter(na_count == 31| na_count == 30) %>% select(FIPS)
+JailMortalityData <- JailMortalityData %>% filter(!FIPS %in% dropfips$FIPS)
+length(unique(JailMortalityData$FIPS))
 ```
 
 
@@ -955,6 +1064,12 @@ AnalysisData <- AnalysisData %>% group_by(FIPS) %>% filter(n() > 1)
 AnalysisData <- ungroup(AnalysisData)
 ```
 
+#Complete Case Analysis
+```{r}
+AnalysisData <- AnalysisData %>% filter(!is.na(County_ADPRate) & !is.na(Deaths))
+nrow(AnalysisData)
+length(unique(AnalysisData$FIPS))
+```
 
 #Turn Party Control of Leg into String
 ```{r}
