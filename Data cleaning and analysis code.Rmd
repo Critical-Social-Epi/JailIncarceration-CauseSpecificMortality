@@ -1625,7 +1625,7 @@ rInfect1 <- glmer(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Pe
 ```
 
 
-#Sensitivity analysis with same outcome years for everyone: 1998-2018
+#Sensitivity analysis with same exposure periods for all models: 1987-2008
 ```{r}
 Sensitivity10 <- AnalysisData %>% filter(Year < "2009")
 ```
