@@ -1706,8 +1706,9 @@ ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`/mean(AnalysisData$Populati
   ylab("Predicted Mortality Rate (per 1,000)\n") 
 dev.off()
 ```
+#SENSITIVITY ANALYSES
 
-#RANDOM INTERCEPT - Sensitivity Analysis
+#Random Intercept - Sensitivity Analysis
 ```{r}
 library(lme4)
 #One-year lag
@@ -1833,4 +1834,77 @@ UnintInj10 <- glm(UnintInjDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate
 
 ## Infectious disease
 Infect10 <- glm(InfectDeaths_10 ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population_10)), data=Sensitivity10, family=quasipoisson)
+```
+
+#Replacing Suppressed Values - Sensativity Analysis
+##Replace all missing mortality counts with 0
+```{r}
+SensSuppr0 <- AnalysisData
+SensSuppr0[c("Deaths", "CancerDeaths", "CerebroDeaths","LwrRspDeaths","DiabDeaths","SubUseDisDeaths","HeartDeaths","SuicDeaths","UnintInjDeaths","InfectDeaths")][is.na(SensSuppr0[c("Deaths", "CancerDeaths", "CerebroDeaths","LwrRspDeaths","DiabDeaths","SubUseDisDeaths","HeartDeaths","SuicDeaths","UnintInjDeaths","InfectDeaths")])] <- 0
+```
+
+```{r}
+#One-year lag
+## Substance Use
+Substance1 <- glm(SubUseDisDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Suicide
+Suic1 <- glm(SuicDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Cancer
+Cancer1 <- glm(CancerDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro1 <- glm(CerebroDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp1 <- glm(LwrRspDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Diabetes
+Diab1 <- glm(DiabDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Heart Disease
+Heart1 <- glm(HeartDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj1 <- glm(UnintInjDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+
+## Infectious disease
+Infect1 <- glm(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr0, family=quasipoisson)
+```
+
+##Replace all missing mortality counts with 9
+```{r}
+SensSuppr9 <- AnalysisData
+SensSuppr9[c("Deaths", "CancerDeaths", "CerebroDeaths","LwrRspDeaths","DiabDeaths","SubUseDisDeaths","HeartDeaths","SuicDeaths","UnintInjDeaths","InfectDeaths")][is.na(SensSuppr9[c("Deaths", "CancerDeaths", "CerebroDeaths","LwrRspDeaths","DiabDeaths","SubUseDisDeaths","HeartDeaths","SuicDeaths","UnintInjDeaths","InfectDeaths")])] <- 9
+```
+
+```{r}
+#One-year lag
+## Substance Use
+Substance1 <- glm(SubUseDisDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Suicide
+Suic1 <- glm(SuicDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Cancer
+Cancer1 <- glm(CancerDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Cerebrovascular
+Cerebro1 <- glm(CerebroDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Lower Respiratory
+LwrRsp1 <- glm(LwrRspDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Diabetes
+Diab1 <- glm(DiabDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Heart Disease
+Heart1 <- glm(HeartDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Unintentional Injury
+UnintInj1 <- glm(UnintInjDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
+
+## Infectious disease
+Infect1 <- glm(InfectDeaths ~ ADPper1000 + PovertyRate + TotalCrime_rate + Percent_Black_county  + MedianAge + Unemployment_Rate + Party + CUSTRATE + Year + FIPS + offset(log(Population)), data=SensSuppr9, family=quasipoisson)
 ```
