@@ -1112,7 +1112,7 @@ library(directlabels)
 library(gridExtra)
 
 
-png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 2_11-2.png", res = 600, width = 9, height = 6, units = "in")
+pdf(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Final/Figure1.pdf", width = 9, height = 6)
 plot1 <- ggplot(data = Fig1, aes(x=Year, y=County_ADPRate)) +
   geom_boxplot() +
   theme_tufte() +
@@ -1148,21 +1148,21 @@ grid.arrange(plot1, plot2, ncol=2, widths = c(4, 1))
 
 #Plot mortality data
 ```{r}
-test <- AnalysisData  %>% select(c(Year, Population, CancerDeaths:InfectDeaths)) %>% group_by(Year) %>% summarize_all(sum, na.rm=TRUE) 
-test$Year <- as.numeric(test$Year) + 1
-test$Year <- as.factor(test$Year)
-test_long <- gather(test, cause, deaths, CancerDeaths:InfectDeaths, factor_key=TRUE)
-test_long$rate <- test_long$deaths/test_long$Population*1000
-test_long$label <- ifelse(test_long$cause == "CancerDeaths", "Malignant neoplasm", ifelse(test_long$cause == "CerebroDeaths", "Cerebrovascular disease", ifelse(test_long$cause == "LwrRspDeaths", "Chronic lower respiratory disease", ifelse(test_long$cause == "DiabDeaths", "Diabetes", ifelse(test_long$cause == "SubUseDisDeaths", "Substance-induced", ifelse(test_long$cause == "HeartDeaths", "Heart disease", ifelse(test_long$cause == "SuicDeaths", "Suicide", ifelse(test_long$cause == "UnintInjDeaths", "Unintentional injury", ifelse(test_long$cause == "InfectDeaths","Infectious disease", NA)))))))))
+Fig2 <- AnalysisData  %>% select(c(Year, Population, CancerDeaths:InfectDeaths)) %>% group_by(Year) %>% summarize_all(sum, na.rm=TRUE) 
+Fig2$Year <- as.numeric(Fig2$Year) + 1
+Fig2$Year <- as.factor(Fig2$Year)
+Fig2_long <- gather(Fig2, cause, deaths, CancerDeaths:InfectDeaths, factor_key=TRUE)
+Fig2_long$rate <- Fig2_long$deaths/Fig2_long$Population*1000
+Fig2_long$label <- ifelse(Fig2_long$cause == "CancerDeaths", "Malignant neoplasm", ifelse(Fig2_long$cause == "CerebroDeaths", "Cerebrovascular disease", ifelse(Fig2_long$cause == "LwrRspDeaths", "Chronic lower respiratory disease", ifelse(Fig2_long$cause == "DiabDeaths", "Diabetes", ifelse(Fig2_long$cause == "SubUseDisDeaths", "Substance-induced", ifelse(Fig2_long$cause == "HeartDeaths", "Heart disease", ifelse(Fig2_long$cause == "SuicDeaths", "Suicide", ifelse(Fig2_long$cause == "UnintInjDeaths", "Unintentional injury", ifelse(Fig2_long$cause == "InfectDeaths","Infectious disease", NA)))))))))
 ```
 
 
 ```{r}
 library(ggthemes)
 library(directlabels)
-png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Figure 3_plot mortality data.png", res = 600, width = 11, height = 4, units = "in")
-test_long <- test_long %>% filter(Year %in% c(1988:2018))
-ggplot(data = test_long, aes(x=Year, y=rate, color=cause, group=cause)) +
+pdf(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Final/Figure2.pdf", width = 11, height = 4)
+Fig2_long <- Fig2_long %>% filter(Year %in% c(1988:2018))
+ggplot(data = Fig2_long, aes(x=Year, y=rate, color=cause, group=cause)) +
   geom_line() +
   geom_dl(aes(label = label), method = list("last.bumpup", fontfamily="serif", cex=.9, vjust=2))+
   theme_tufte() +
@@ -1688,7 +1688,7 @@ plotdata$`Cause of Death` <- plotdata$COD
 mycolors8<- scales::hue_pal()(8) 
 library(ggthemes)
 
-png(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/PredictedCurvCOD_10-29-20.png", res = 600, width = 6, height = 4, units = "in")
+pdf(file = "/Users/sk4538/Sync/Mass Incarceration and Public Health/County Jail and Health/Cause of Death/Figures/Final/Figure3.pdf", width = 6, height = 4)
 
 ggplot(plotdata, aes(x=ADPper1000, y=`Predicted Rate`/mean(AnalysisData$Population, na.rm=TRUE)*1000, group=Lag)) +
   geom_line(aes(color = Lag)) +
