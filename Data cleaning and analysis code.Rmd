@@ -1117,7 +1117,7 @@ plot1 <- ggplot(data = Fig1, aes(x=Year, y=County_ADPRate)) +
   geom_boxplot() +
   theme_tufte() +
   ylab("Jail incarceration rate (per 1,000)") +
-  scale_x_discrete(breaks = pretty(as.numeric(rev(test$Year)), n = 15)) +
+  scale_x_discrete(breaks = pretty(as.numeric(rev(Fig1$Year)), n = 15)) +
   coord_cartesian(clip = 'off') +
   ggtitle("A") +
   theme(
@@ -1131,7 +1131,7 @@ plot2 <- ggplot(data = forplot, aes(x=Year, y=ChangeinVal)) +
   theme_tufte() +
   ylab("Maximum within-county change in jail incarceration rate") +
   xlab(" ") +
-  scale_x_discrete(breaks = pretty(as.numeric(rev(test$Year)), n = 15)) +
+  scale_x_discrete(breaks = pretty(as.numeric(rev(forplot$Year)), n = 15)) +
   coord_cartesian(clip = 'off') +
   ggtitle("B")+
   theme(
